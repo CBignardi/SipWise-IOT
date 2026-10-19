@@ -56,7 +56,6 @@
 #define ACCEL_XOUT_H 0x3B
 #define PWR_MGMT_1 0x6B
 
-
 // ============================================================
 //  GLOBAL OBJECT
 // ============================================================
@@ -64,7 +63,6 @@ BluetoothSerial SerialBT;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 HX711 scale;
 Adafruit_AHTX0 aht;
-
 
 // ============================================================
 //  VARIABLES
@@ -80,11 +78,6 @@ bool goalAutoUpdate = true;  // true -> automatic update; false -> value defined
 
 bool clockSynced = false;
 int actualDay = -1;
-
-// Timestamp
-unsigned long tsLastMovement = 0;  // Last time it was detected a movement
-unsigned long tsLastRead = 0;      // Last time it read the weight
-unsigned long tsState = 0;         // Momento di ingresso nello stato corrente (usato per timeout) ---------------------- DA CAPIRE
 
 bool btConnected = false;
 
@@ -201,9 +194,7 @@ void setup() {
 // ============================================================
 void loop() {
 
-
   manageBT();
-
 
   bool connected = SerialBT.connected();
 
@@ -215,7 +206,7 @@ void loop() {
     changeState(DISPLAY_CONNECTED);
   }
 
-  // Disconnection BT detected (transizione true → false)
+  // Disconnection BT detected
   if (!connected && btConnected) {
     btConnected = false;
     Serial.println("Bluetooth disconnected.");
@@ -229,35 +220,17 @@ void loop() {
 
   switch (state) {
 
-
     case WAIT_CONNECTION:
       break;
 
-    // ── STATO 2: CONNESSO DISPLAY ────────────────────────────
-    // Mostra il messaggio "BT Connesso!" per 2 secondi, poi avvia il monitoraggio.
-    // Resetta anche tsUltimaLettura per far partire subito il timer dei 20 minuti.
     case DISPLAY_CONNECTED:
       if (timer.isOver()) {
         timer.startTimer(INTERVAL_READ);  // Start the timer for the reading
         changeState(CHECK_MOVEMENT);
       }
-
-      // if (millis() - tsState >= 2000UL) {
-      //   tsLastRead = millis();  // Parte il conto alla rovescia dei 20 minuti
-      //   changeState(CHECK_MOVEMENT);
-      // }
       break;
 
-    // ── STATO 3: CONTROLLO MOVIMENTO ─────────────────────────
-    // Nucleo del monitoraggio: legge l'accelerazione netta ogni ~50ms
-    // e decide cosa fare in base all'intensità del movimento.
-    //
-    //  • acc > SOGLIA_GRANDE_MOV (1.5g) → la borraccia è stata alzata/usata
-    //                                      → passa a DOPO_GRANDE_MOVIMENTO
-    //  • acc > SOGLIA_MOVIMENTO  (0.3g) → piccola vibrazione/spostamento
-    //                                      → resetta il timer 20 min (la misurazione non è affidabile)
-    //  • acc ≤ SOGLIA_MOVIMENTO          → borraccia ferma
-    //                                      → se sono passati 20 min → LETTURA_IN_CORSO
+
     case CHECK_MOVEMENT:
       {
         float acc = readAcceleration();
@@ -279,10 +252,7 @@ void loop() {
         break;
       }
 
-    // ── STATO 4: DOPO GRANDE MOVIMENTO ───────────────────────
-    // La borraccia è stata spostata o usata. Si attende che si fermi
-    // (ATTESA_DOPO_MOV_MS = 2 secondi dall'ultimo grande movimento).
-    // Successivamente si procede alla lettura del nuovo peso.
+
     case AFTER_MOVEMENT:
       if (timer.isOver()) {
         timer.startTimer(2500UL);  // Set the timer for 2,5s
@@ -291,10 +261,6 @@ void loop() {
 
       break;
 
-    // ── STATO 5: LETTURA IN CORSO ─────────────────────────────
-    // Verifica che la borraccia sia effettivamente ferma prima di leggere il peso.
-    // Se si muove ancora → torna al monitoraggio (reset timer 20 min).
-    // Se è ferma per almeno 500ms consecutivi → salva il peso.
     case READING_IN_PROGRESS:
       {
         float acc = readAcceleration();
@@ -309,15 +275,6 @@ void loop() {
         break;
       }
 
-    // ── STATO 6: SALVA PESO ───────────────────────────────────
-    // Nucleo della misura:
-    //   1. Legge il peso attuale dalla bilancia (5 campioni mediati)
-    //   2. Calcola la differenza rispetto al peso iniziale (= acqua bevuta)
-    //   3. Accumula nel totale giornaliero
-    //   4. Aggiorna il peso di riferimento per la prossima misura
-    //   5. Legge temperatura e umidità dall'AHT20
-    //   6. Ricalcola il fabbisogno idrico consigliato (se i dati utente sono disponibili)
-    //   7. Aggiorna display e invia i dati all'app via BT
     case SAVE_WEIGHT:
       {
         weightBottle_g = scale.get_units(5);
@@ -385,10 +342,7 @@ void loop() {
       }
       break;
 
-    // ── STATO 10: MISURA TARA ─────────────────────────────────
-    // Verifica che la borraccia sia ferma prima di eseguire la tara.
-    // Se è ancora in movimento: mostra avviso e rimane in attesa (senza transizioni).
-    // Se è ferma: esegue la tara e passa a TARA_DISPLAY.
+
     case TARE_MEASUREMENT:
       {
         float acc = readAcceleration();
@@ -438,7 +392,6 @@ bool wait(int delay_ms, unsigned long startTime) {
 
 void changeState(State newState) {
   state = newState;
-  tsState = millis();
 
   switch (newState) {
 
@@ -452,7 +405,7 @@ void changeState(State newState) {
 
     case CHECK_MOVEMENT:
       updateDisplay("");
-     
+
       break;
 
     case AFTER_MOVEMENT:
@@ -540,7 +493,6 @@ float readAcceleration() {
 }
 
 
-
 float calculateWaterGoal(float weight_kg, int age, float temp_C) {
   float ml = weight_kg * 35.0f;  // Basic Formula
 
@@ -568,7 +520,6 @@ void updateDisplay(const char* r1, const char* r2, const char* r3) {
 }
 
 
-
 time_t getEpochNow() {
   if (!clockSynced) {
     return 0;  // Do not read, it isn't sincronized
@@ -577,24 +528,11 @@ time_t getEpochNow() {
 }
 
 
-
 int getDayNumber(time_t epoch) {
   return (int)(epoch / 86400L);  // 86400 (seconds in a day) = 60 (seconds) * 60 (minutes) * 24 (hours)
 }
 
 
-// ── controllaReset24h ─────────────────────────────────────────
-// Rilevamento del cambio di mezzanotte tramite confronto del numero del giorno.
-// Va chiamata ogni ciclo loop() quando l'orologio è sincronizzato.
-//
-// Comportamento:
-//   1. Prima chiamata dopo sincronizzazione: inizializza giornoAttuale e torna.
-//   2. Chiamate successive: confronta il giorno attuale con giornoAttuale.
-//      Se diversi (è mezzanotte passata):
-//        a. Invia all'app il totale acqua della giornata conclusa ("GIORNATA,<ml>")
-//        b. Azzera acquaBevuta_ml per il nuovo giorno
-//        c. Aggiorna giornoAttuale
-//        d. Mostra messaggio "Nuovo giorno!" sul display per 2 s
 void checkReset24h() {
   int today = getDayNumber(getEpochNow());  // Number of today
 
@@ -612,14 +550,6 @@ void checkReset24h() {
 
     waterDrinked_ml = 0.0f;
     actualDay = today;
-
-    // updateDisplay("New Day!", "All variables reset");
-    //delay(2000);
-
-    // Ripristina il display dello stato corrente se siamo in un contesto "normale"
-    //if (state == CHECK_MOVEMENT) {
-    //   updateDisplay("Check in progress...");
-    //}
   }
 }
 
@@ -634,47 +564,6 @@ void sendDailyWater(float ml) {
 }
 
 
-// ── gestisciBT ────────────────────────────────────────────────
-// Legge e processa un eventuale messaggio Bluetooth in arrivo dall'app.
-// Va chiamata ad ogni ciclo loop() (anche durante stati "passivi") per garantire
-// che i comandi vengano sempre elaborati in tempo reale.
-//
-// Il messaggio è atteso come stringa terminata da '\n'.
-// Viene trimmato (rimozione spazi e '\r') prima dell'analisi.
-//
-// ──────────────────────────────────────────────────────────────
-// COMANDI GESTITI:
-//
-//  "PESO:<kg>"
-//    Imposta il peso corporeo dell'utente (es. "PESO:72.5").
-//    Contestualmente legge il peso attuale della borraccia come riferimento iniziale.
-//
-//  "ETA:<anni>"
-//    Imposta l'età dell'utente (es. "ETA:34").
-//    Usata nella formula calcolaAcquaConsigliata().
-//
-//  "OBIETTIVO:<ml>"
-//    Sovrascrive il target idrico giornaliero (es. "OBIETTIVO:2500").
-//    Risponde: "OK:OBIETTIVO"
-//    Mostra il nuovo obiettivo sul display per 1,5 s.
-//
-//  "TIME:<epoch>"
-//    Sincronizza l'orologio interno con il timestamp Unix ricevuto.
-//    Valido solo se epoch > 1.000.000.000 (≥ anno 2001) → sanity check.
-//    Risponde: "OK:TIME" oppure "ERR:TIME" se il valore è fuori range.
-//
-//  "TARA"
-//    Avvia la sequenza di tara della bilancia.
-//    Porta la FSM in stato RICHIESTA_TARA.
-//
-//  "INVIA"
-//    Richiesta manuale di invio dati: chiama inviaStatoBT().
-//    L'app riceve: "DATI,<acquaBevuta>,<acquaConsigliata>,<pesoBorraccia>,<temp>,<umidità>"
-//
-//  "INVIA_GIORN"
-//    Richiesta manuale del totale giornaliero.
-//    Chiama inviaAcquaGiornaliera() con il valore corrente di acquaBevuta_ml.
-//
 
 void manageBT() {
   // Check if there are some bytes to be read
@@ -689,14 +578,6 @@ void manageBT() {
   // ── Command WEIGHT ──────────────────────────────────────────
   if (msg.startsWith("WEIGHT:")) {
     weightPerson_kg = msg.substring(7).toFloat();
-    // Legge subito il peso attuale della borraccia come punto di partenza
-    // per il calcolo della differenza nelle misurazioni successive
-
-
-
-    // DA CAPIRE IL SENSO
-    //weightStart_g = scale.get_units(5);
-    //Serial.printf("Person weight: %.1f kg | Bottle weight init: %.0f g\n", weightPerson_kg, weightStart_g);
   }
 
   // ── Command AGE ───────────────────────────────────────────
@@ -758,24 +639,6 @@ void manageBT() {
 }
 
 
-// ── inviaStatoBT ──────────────────────────────────────────────
-// Legge i valori attuali di tutti i sensori e invia un messaggio
-// completo di stato all'app via Bluetooth.
-//
-// Formato messaggio:
-//   "DATI,<acquaBevuta_ml>,<acquaConsigliata_ml>,<pesoBorraccia_g>,<temperatura>,<umidità>\n"
-//
-// Esempio:
-//   "DATI,450,2000,320,23.5,58\n"
-//
-// I valori numerici:
-//   acquaBevuta_ml    → intero (0 decimali)
-//   acquaConsigliata  → intero (0 decimali)
-//   pesoBorraccia_g   → intero (0 decimali)
-//   temperatura       → 1 decimale (es. 23.5)
-//   umidità           → intero (0 decimali, percentuale)
-//
-// Non fa nulla se il BT non è connesso.
 void sendStateBT() {
   if (!btConnected) return;
 
@@ -800,16 +663,6 @@ void sendStateBT() {
 }
 
 
-// ── eseguiTara ───────────────────────────────────────────────
-// Esegue la tara della bilancia: campiona il valore attuale
-// e lo usa come nuovo zero di riferimento per tutte le misure successive.
-// Questo è necessario se viene aggiunto o rimosso un oggetto fisso dalla borraccia
-// (es. supporto, cover) o se il sensore ha driftato nel tempo.
-//
-// Dopo la tara:
-//   • pesoBorraccia_g viene azzerato (nessun peso misurato in questo momento)
-//   • pesoInizio_g viene azzerato (il riferimento per il calcolo acqua bevuta si resetta)
-//   • Invia "OK:TARA" all'app come conferma
 void doTare() {
   scale.tare();
   weightBottle_g = 0.0f;
