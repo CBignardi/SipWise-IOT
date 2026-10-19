@@ -35,6 +35,9 @@ Calcolato dividendo il valore raw letto con un peso campione noto per il suo val
 
 ## Macchina a stati (FSM – Finite State Machine)
 
+![Macchina a Stati](State_Machine.svg)
+
+<!--
 ```text
 ATTESA_CONNESSIONE
     │  (BT connesso)
@@ -65,6 +68,7 @@ CONNESSO_DISPLAY  ──(2 s)──▶  CONTROLLO_MOVIMENTO
                                      ▼
                                TARA_DISPLAY  ──(2 s)──▶  CONTROLLO_MOVIMENTO
 ```
+-->
 
 ---
 
