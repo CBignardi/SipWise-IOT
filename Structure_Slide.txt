@@ -1,0 +1,21 @@
+-- Primo Capitolo: "Overview"
+    Spiegazione dell'idea del progetto, cioè andare a controllare la salute della persona attraverso la misurazione di quanta acqua che beve.
+    - Partire da citare le altre aziende competitor (8sleep, whoop, e quella dell'anello che misura tutto ...)
+        dire che tutte queste aziende misurano tutto tranne quanta acqua bevi realmente
+    - Render (?) del dispositivo spiegando ad alto livello da cosa è composto: 
+        "un esp32, un sensore per misurare il peso della borraccia e tutto verrà inviato ad un app nel telefono, dalla quale si può controllare tutto.
+        Dopo di che questi dati verrano mandati nel cloud e verranno processati tramite l'ai per dire se le tue abitudini sono sane"
+        (forse qua bisogna dire che nel futuro è necessario integrare questi dati con i dati più generici della persona, esempio collegare all'app salute del telefono)
+    - Concludere ribadendo che il nostro approccio è simile (cioè raccogliere dati e usare l'ai) a quello delle aziende big precedenti, ma misuriamo quello che loro non misurano 
+
+
+-- Secondo Capitolo: "How it's made"
+    Spiegazione di come è stato costruito il progetto:
+    - Spiegazione degli "attori" che ci sono, cioè lo scenario normale di scambio dati tra esp-app-cloud-ai
+    - Spiegazione Esp32, descivere macchina a stati e sensori utilizzati e come vengono collegati
+    - Spiegazione app, descrizione generica, descrizione scambio messaggi, poi si introduce il cloud-ai dicendo che è l'app ad inviare i dati in cloud
+    - Spiegazione cloud, che si utilizza ThingSpeak e si salvano i dati in 3 canali
+    - Spiegazione Ai, l'ai prende i dati da ThingSpeak e progessa il risultato che sarà messo su ThingSpeak
+
+-- Terzo Capitolo: "Future" (molto breve)
+    Citare che si sta progettando un mini dispositivo che si mette sotto il bicchiere oppure come posa bicchiere, in modo da misurare anche quando sei a cena/pranzo.
