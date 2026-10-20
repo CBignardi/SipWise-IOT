@@ -113,6 +113,7 @@ enum State {
   READING_IN_PROGRESS,
   SAVE_WEIGHT,
   WAIT_5_SEC,
+  CMD_ARRIVED,
   REQUEST_TARE,
   TARE_MEASUREMENT,
   TARE_DISPLAY,
@@ -121,6 +122,7 @@ enum State {
 
 // Actual state
 State state = WAIT_CONNECTION;
+State prevState;
 
 
 // ============================================================
@@ -194,17 +196,15 @@ void setup() {
 // ============================================================
 void loop() {
 
-  manageBT();
+  // Is something in the BT
+  if (SerialBT.available()) {
+    prevState = state;
+    changeState(CMD_ARRIVED);
+  }
+
+  // manageBT();
 
   bool connected = SerialBT.connected();
-
-  // New connection BT detected
-  if (connected && !btConnected) {
-    btConnected = true;
-    Serial.println("Bluetooth connected.");
-    timer.startTimer(2000UL);  // Start timer 2 sec
-    changeState(DISPLAY_CONNECTED);
-  }
 
   // Disconnection BT detected
   if (!connected && btConnected) {
@@ -221,11 +221,16 @@ void loop() {
   switch (state) {
 
     case WAIT_CONNECTION:
+      // New connection BT detected
+      if (connected && !btConnected) {
+        btConnected = true;
+        Serial.println("Bluetooth connected.");
+        changeState(DISPLAY_CONNECTED);
+      }
       break;
 
     case DISPLAY_CONNECTED:
       if (timer.isOver()) {
-        timer.startTimer(INTERVAL_READ);  // Start the timer for the reading
         changeState(CHECK_MOVEMENT);
       }
       break;
@@ -235,9 +240,10 @@ void loop() {
       {
         float acc = readAcceleration();
 
+        //Serial.printf("DBG Movement: %.2f g\n", acc);
+
         if (acc > THRESHOLD_MOVEMENT_HIGH) {
           Serial.printf("Movement: %.2f g\n", acc);
-          timer.startTimer(WAIT_AFTER_MOV);  // Set the timer for the interval before the reading
           changeState(AFTER_MOVEMENT);
 
         } else if (acc > THRESHOLD_MOVEMENT_LOW) {
@@ -255,7 +261,6 @@ void loop() {
 
     case AFTER_MOVEMENT:
       if (timer.isOver()) {
-        timer.startTimer(2500UL);  // Set the timer for 2,5s
         changeState(READING_IN_PROGRESS);
       }
 
@@ -265,7 +270,6 @@ void loop() {
       {
         float acc = readAcceleration();
         if (acc > THRESHOLD_MOVEMENT_LOW) {
-          timer.startTimer(INTERVAL_READ);  // Reset the timer for the reading
           changeState(CHECK_MOVEMENT);
         } else {
           if (timer.isOver()) {
@@ -322,7 +326,6 @@ void loop() {
         Serial.printf("[Save] Weight:%.0fg | Water today:%.0f/%.0fml | T:%.1fC H:%.0f%%\n",
                       weightBottle_g, waterDrinked_ml, waterGoal_ml, tempC, humidity);
 
-        timer.startTimer(WAIT_AFTER_READ);  // Set the timer after the reading
         changeState(WAIT_5_SEC);
         break;
       }
@@ -330,8 +333,88 @@ void loop() {
 
     case WAIT_5_SEC:
       if (timer.isOver()) {
-        timer.startTimer(INTERVAL_READ);  // Start the timer for the reading
         changeState(CHECK_MOVEMENT);
+      }
+      break;
+
+
+    case CMD_ARRIVED:
+      {
+        String msg = SerialBT.readStringUntil('\n');
+        msg.trim();
+
+        // Log on the serial display
+        Serial.printf("BT recived: %s\n", msg.c_str());
+
+        // ── Command WEIGHT ──────────────────────────────────────────
+        if (msg.startsWith("WEIGHT:")) {
+          weightPerson_kg = msg.substring(7).toFloat();
+          changeState(prevState);
+        }
+
+        // ── Command AGE ───────────────────────────────────────────
+        else if (msg.startsWith("AGE:")) {
+          agePerson = msg.substring(4).toInt();
+          Serial.printf("Age: %d years old\n", agePerson);
+          changeState(prevState);
+        }
+
+        // ── Command GOAL ─────────────────────────────────────
+        else if (msg.startsWith("GOAL:")) {
+          if (msg.substring(5, 6) == "0") {
+            goalAutoUpdate = false;
+            waterGoal_ml = msg.substring(7).toFloat();
+
+          } else {
+            goalAutoUpdate = true;
+            sensors_event_t hum_ev, temp_ev;
+            aht.getEvent(&hum_ev, &temp_ev);
+            float tempC = temp_ev.temperature;
+            waterGoal_ml = calculateWaterGoal(weightPerson_kg, agePerson, tempC);
+          }
+          SerialBT.println("OK:GOAL," + String(waterGoal_ml, 0));
+          Serial.printf("Water goal: %.0f ml/day\n", waterGoal_ml);
+
+          changeState(GOAL_CHANGED);
+        }
+
+        // ── Command TIME ──────────────────────────────────────────
+        else if (msg.startsWith("TIME:")) {
+
+          time_t epoch = (time_t)msg.substring(5).toDouble();
+
+          // Sanity check: values Unix below 1.000.000.000 correspond to dates prior to September 2001 → almost certainly a data entry error
+          if (epoch > 1000000000L) {
+            struct timeval tv = { .tv_sec = epoch, .tv_usec = 0 };
+            settimeofday(&tv, nullptr);
+
+            clockSynced = true;
+            actualDay = getDayNumber(epoch);
+            SerialBT.println("OK:TIME");
+            Serial.printf("RTC sincronized: epoch=%lld | day=%d\n", (long long)epoch, actualDay);
+          } else {
+            // Timestamp not valid
+            SerialBT.println("ERR:TIME");
+          }
+          changeState(prevState);
+        }
+
+        // ── Command TARE ──────────────────────────────────────────
+        else if (msg == "TARE") {
+          changeState(REQUEST_TARE);
+        }
+
+        // ── Command SEND ─────────────────────────────────────────
+        else if (msg == "SEND") {
+          sendStateBT();
+          changeState(prevState);
+        }
+
+        // ── Command SEND_DAY ───────────────────────────────────
+        else if (msg == "SEND_DAY") {
+          sendDailyWater(waterDrinked_ml);
+          changeState(prevState);
+        }
       }
       break;
 
@@ -352,23 +435,20 @@ void loop() {
         } else {
           // The bottle is not moving
           doTare();
-          timer.startTimer(2000UL);  // Start the timer for 2 sec
           changeState(TARE_DISPLAY);
         }
         break;
       }
 
-
     case TARE_DISPLAY:
       if (timer.isOver()) {
-        timer.startTimer(INTERVAL_READ);  // Start the timer for the reading
         changeState(CHECK_MOVEMENT);
       }
       break;
 
+
     case GOAL_CHANGED:
       if (timer.isOver()) {
-        timer.startTimer(INTERVAL_READ);  // Start the timer for the reading
         changeState(CHECK_MOVEMENT);
       }
       break;
@@ -383,13 +463,6 @@ void loop() {
 //  FUNCTIONS
 // ============================================================
 
-bool wait(int delay_ms, unsigned long startTime) {
-  if (millis() - startTime >= delay_ms) {
-    return false;
-  }
-  return true;
-}
-
 void changeState(State newState) {
   state = newState;
 
@@ -400,15 +473,18 @@ void changeState(State newState) {
       break;
 
     case DISPLAY_CONNECTED:
+      timer.startTimer(2000UL);  // Start timer 2 sec
       updateDisplay("BT Connected!", "Starting...");
       break;
 
     case CHECK_MOVEMENT:
+      timer.startTimer(INTERVAL_READ);  // Start the timer for the reading
       updateDisplay("");
 
       break;
 
     case AFTER_MOVEMENT:
+      timer.startTimer(WAIT_AFTER_MOV);  // Set the timer for the interval before the reading
       updateDisplay("Movement detected", "Waiting...");
       break;
 
@@ -417,15 +493,18 @@ void changeState(State newState) {
       break;
 
     case READING_IN_PROGRESS:
+      timer.startTimer(2000UL);  // Set the timer for 2 s
       updateDisplay("Reading soon...");
       break;
 
     case WAIT_5_SEC:
       // Mantain the precedent display
+      timer.startTimer(WAIT_AFTER_READ);  // Set the timer after the reading
       break;
 
 
     case REQUEST_TARE:
+      timer.startTimer(1500UL);  // Set the timer to 1,5 sec
       updateDisplay("Tare requested", "Do not move!");
       break;
 
@@ -434,12 +513,14 @@ void changeState(State newState) {
       break;
 
     case TARE_DISPLAY:
+      timer.startTimer(2000UL);  // Start the timer for 2 sec
       updateDisplay("Tare done!");
       break;
 
 
     case GOAL_CHANGED:
       {
+        timer.startTimer(1500UL);  // Start the timer for the display
         char r2[22];
         snprintf(r2, sizeof(r2), "%.0f ml/day", waterGoal_ml);
         updateDisplay("Goal:", r2);
@@ -561,81 +642,6 @@ void sendDailyWater(float ml) {
   payload += String(ml, 0);
   SerialBT.println(payload);
   Serial.printf("BT sended report: %s\n", payload.c_str());
-}
-
-
-
-void manageBT() {
-  // Check if there are some bytes to be read
-  if (!SerialBT.available()) return;
-
-  String msg = SerialBT.readStringUntil('\n');
-  msg.trim();
-
-  // Log on the serial display
-  Serial.printf("BT recived: %s\n", msg.c_str());
-
-  // ── Command WEIGHT ──────────────────────────────────────────
-  if (msg.startsWith("WEIGHT:")) {
-    weightPerson_kg = msg.substring(7).toFloat();
-  }
-
-  // ── Command AGE ───────────────────────────────────────────
-  else if (msg.startsWith("AGE:")) {
-    agePerson = msg.substring(4).toInt();
-    Serial.printf("Età: %d years old\n", agePerson);
-  }
-
-  // ── Command GOAL ─────────────────────────────────────
-  else if (msg.startsWith("GOAL:")) {
-    if (msg.substring(5, 6) == "0") {
-      goalAutoUpdate = false;
-    } else {
-      goalAutoUpdate = true;
-    }
-    waterGoal_ml = msg.substring(7).toFloat();
-    SerialBT.println("OK:GOAL");
-    Serial.printf("Water goal: %.0f ml/day\n", waterGoal_ml);
-
-    timer.startTimer(1500UL);  // Start the timer for the display
-    changeState(GOAL_CHANGED);
-  }
-
-  // ── Command TIME ──────────────────────────────────────────
-  else if (msg.startsWith("TIME:")) {
-
-    time_t epoch = (time_t)msg.substring(5).toDouble();
-
-    // Sanity check: values Unix below 1.000.000.000 correspond to dates prior to September 2001 → almost certainly a data entry error
-    if (epoch > 1000000000L) {
-      struct timeval tv = { .tv_sec = epoch, .tv_usec = 0 };
-      settimeofday(&tv, nullptr);
-
-      clockSynced = true;
-      actualDay = getDayNumber(epoch);
-      SerialBT.println("OK:TIME");
-      Serial.printf("RTC sincronized: epoch=%lld | day=%d\n", (long long)epoch, actualDay);
-    } else {
-      // Timestamp not valid
-      SerialBT.println("ERR:TIME");
-    }
-  }
-
-  // ── Command TARE ──────────────────────────────────────────
-  else if (msg == "TARE") {
-    timer.startTimer(1500UL);  // Set the timer to 1,5 sec
-    changeState(REQUEST_TARE);
-  }
-
-  // ── Command SEND ─────────────────────────────────────────
-  else if (msg == "SEND") {
-    sendStateBT();
-  }
-
-  // ── Command SEND_DAY ───────────────────────────────────
-  else if (msg == "SEND_DAY") {
-    sendDailyWater(waterDrinked_ml);
-  }
 }
 
 
