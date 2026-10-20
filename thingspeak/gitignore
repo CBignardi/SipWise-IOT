@@ -1,0 +1,28 @@
+# Directory di build generate da CMake
+/build/
+/cmake-build-*/
+
+# File e directory generati da CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+
+# File generati da strumenti di build
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dll
+*.dylib
+*.exe
+*.out
+
+# File temporanei e di configurazione dell'IDE
+.DS_Store
+Thumbs.db
