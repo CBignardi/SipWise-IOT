@@ -3,6 +3,9 @@
 #include <sstream>
 #include <map>
 #include <curl/curl.h>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 // Funzione di callback per catturare la risposta HTTP
 size_t WriteCallback(void *contents, size_t size, size_t nmemb, std::string *userp)
@@ -13,7 +16,7 @@ size_t WriteCallback(void *contents, size_t size, size_t nmemb, std::string *use
 }
 
 // Esegue una richiesta HTTP GET
-void performGet(const std::string &url)
+void performGet(const std::string &url, const std::string &canale)
 {
     CURL *curl;
     CURLcode res;
@@ -34,8 +37,24 @@ void performGet(const std::string &url)
         }
         else
         {
-            std::cout << "\n--- Risposta GET ---\n"
+            json dataJson = json::parse(readBuffer);
+
+            std::cout << "--- Risposta GET ---\n"
                       << readBuffer << "\n--------------------\n";
+
+            int maxIter = 4;
+            if (canale == "TREND")
+            {
+                maxIter = 1;
+            }
+
+            for (int i = 0; i < maxIter; i++)
+            {
+                std::ostringstream sstr;
+                sstr << "field" << i + 1;
+
+                std::cout << dataJson["channel"][sstr.str()] << ": " << dataJson["feeds"][0][sstr.str()] << std::endl;
+            }
         }
         curl_easy_cleanup(curl);
     }
@@ -64,7 +83,7 @@ void performPost(const std::string &url, const std::string &postData)
         }
         else
         {
-            std::cout << "\n--- Risposta POST ---\n"
+            std::cout << "--- Risposta POST ---\n"
                       << readBuffer << "\n---------------------\n";
         }
         curl_easy_cleanup(curl);
@@ -109,7 +128,7 @@ int main(int argc, char *argv[])
     if (metodo == "GET")
     {
         std::cout << "Leggendo dal canale " << canale << "...\n";
-        performGet(channels[canale].readUrl);
+        performGet(channels[canale].readUrl, canale);
     }
     else if (metodo == "POST")
     {
@@ -117,16 +136,7 @@ int main(int argc, char *argv[])
         std::cout << "Scrivendo sul canale " << canale << "; payload: ";
         for (int i = 0; i < argc - 3; i++)
         {
-            int index;
-            if (canale == "TREND")
-            {
-                index = i + 1;
-            }
-            else
-            {
-                index = i + 2;
-            }
-            sstr << "&field" << index << "=" << argv[i + 3];
+            sstr << "&field" << i + 1 << "=" << argv[i + 3];
         }
         std::cout << sstr.str() << std::endl;
         std::string postUrl = "https://api.thingspeak.com/update";
