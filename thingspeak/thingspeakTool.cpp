@@ -33,13 +33,13 @@ void performGet(const std::string &url, const std::string &canale)
 
         if (res != CURLE_OK)
         {
-            std::cerr << "Errore cURL (GET): " << curl_easy_strerror(res) << std::endl;
+            std::cerr << "Error cURL (GET): " << curl_easy_strerror(res) << std::endl;
         }
         else
         {
             json dataJson = json::parse(readBuffer);
 
-            std::cout << "--- Risposta GET ---\n"
+            std::cout << "--- Response GET ---\n"
                       << readBuffer << "\n--------------------\n";
 
             int maxIter = 4;
@@ -79,11 +79,11 @@ void performPost(const std::string &url, const std::string &postData)
 
         if (res != CURLE_OK)
         {
-            std::cerr << "Errore cURL (POST): " << curl_easy_strerror(res) << std::endl;
+            std::cerr << "Error cURL (POST): " << curl_easy_strerror(res) << std::endl;
         }
         else
         {
-            std::cout << "--- Risposta POST ---\n"
+            std::cout << "--- Response POST ---\n"
                       << readBuffer << "\n---------------------\n";
         }
         curl_easy_cleanup(curl);
@@ -95,10 +95,10 @@ int main(int argc, char *argv[])
     // Controllo dei parametri a riga di comando
     if (argc < 3)
     {
-        std::cout << "Uso corretto:\n";
-        std::cout << "  Lettura (GET):  " << argv[0] << " <CANALE> GET\n";
-        std::cout << "  Scrittura (POST): " << argv[0] << " <CANALE> POST <VALORE> ...\n\n";
-        std::cout << "Canali disponibili: DATA, TREND, HUMAN\n";
+        std::cout << "Correct use:\n";
+        std::cout << "\tRead (GET):  " << argv[0] << " <CHANNEL> GET\n";
+        std::cout << "\tWrite (POST): " << argv[0] << " <CHANNEL> POST <VALUE> <VALUE> ...\n\n";
+        std::cout << "Channels available: DATA, TREND, HUMAN\n";
         return 1;
     }
 
@@ -120,20 +120,20 @@ int main(int argc, char *argv[])
     // Validazione del canale
     if (channels.find(canale) == channels.end())
     {
-        std::cerr << "Errore: Canale '" << canale << "' non valido! Scegli tra DATA, TREND, HUMAN.\n";
+        std::cerr << "Error: Channel '" << canale << "' not valid! Choose from DATA, TREND, HUMAN.\n";
         return 1;
     }
 
     // Esecuzione in base al metodo scelto
     if (metodo == "GET")
     {
-        std::cout << "Leggendo dal canale " << canale << "...\n";
+        std::cout << "Reading from the channel: " << canale << "...\n";
         performGet(channels[canale].readUrl, canale);
     }
     else if (metodo == "POST")
     {
         std::ostringstream sstr;
-        std::cout << "Scrivendo sul canale " << canale << "; payload: ";
+        std::cout << "Writing on the channel: " << canale << "; payload: ";
         for (int i = 0; i < argc - 3; i++)
         {
             sstr << "&field" << i + 1 << "=" << argv[i + 3];
