@@ -1,21 +1,23 @@
 -- Primo Capitolo: "Overview"
     Spiegazione dell'idea del progetto, cioè andare a controllare la salute della persona attraverso la misurazione di quanta acqua che beve.
-    - Partire da citare le altre aziende competitor (8sleep, whoop, e quella dell'anello che misura tutto ...)
-        dire che tutte queste aziende misurano tutto tranne quanta acqua bevi realmente
-    - Render (?) del dispositivo spiegando ad alto livello da cosa è composto: 
-        "un esp32, un sensore per misurare il peso della borraccia e tutto verrà inviato ad un app nel telefono, dalla quale si può controllare tutto.
-        Dopo di che questi dati verrano mandati nel cloud e verranno processati tramite l'ai per dire se le tue abitudini sono sane"
-        (forse qua bisogna dire che nel futuro è necessario integrare questi dati con i dati più generici della persona, esempio collegare all'app salute del telefono)
-    - Concludere ribadendo che il nostro approccio è simile (cioè raccogliere dati e usare l'ai) a quello delle aziende big precedenti, ma misuriamo quello che loro non misurano 
+    - 1 Partire dal problema che beviamo poco, e dire che volevamo provare a risolvere questo problema
+    - 2 Spieghiamo che le altre aziende che sono in questo mercato non misurano automaticamente l'acqua
+    - 3 Render full, spiegare da cosa è composto (alto livello) e qual'è lo scenario di utilizzo normale
+    - 4 Dire che usiamo l'ai per capire se le tue abitudini sono buone, e dare un richiamo ai miglioramenti futuri dove l'utilizzo del ai sarà migliore
+        (Fare una mini conclusione di capitolo?, tipo "Quindi con questo progetto ci posizioniamo in buco di mercato.. e potrebbe avere buone prospettive") 
 
 
 -- Secondo Capitolo: "How it's made"
     Spiegazione di come è stato costruito il progetto:
-    - Spiegazione degli "attori" che ci sono, cioè lo scenario normale di scambio dati tra esp-app-cloud-ai
-    - Spiegazione Esp32, descivere macchina a stati e sensori utilizzati e come vengono collegati
-    - Spiegazione app, descrizione generica, descrizione scambio messaggi, poi si introduce il cloud-ai dicendo che è l'app ad inviare i dati in cloud
-    - Spiegazione cloud, che si utilizza ThingSpeak e si salvano i dati in 3 canali
-    - Spiegazione Ai, l'ai prende i dati da ThingSpeak e progessa il risultato che sarà messo su ThingSpeak
+    - 1 Spiegazione degli "attori" che ci sono, cioè lo scenario normale di scambio dati tra esp-app-cloud-ai
+    - 2 Spiegazione Esp32, descivere macchina a stati ridotta, sensori utilizzati e come comunicano
+    - 3 Spiegazione app, creata attraverso Mit AppInventor, "si occupa di gestire tutto e modifica le configurazioni", (foto delle due schermate)
+      - 4  Descrizione scambio messaggi, scrivere i principali, si introduce il cloud-ai dicendo che è l'app ad inviare i dati in cloud
+    - 5 Spiegazione cloud, che si utilizza ThingSpeak e si salvano i dati in 3 canali
+    - 6 Spiegazione Ai, l'ai prende i dati da ThingSpeak e progessa il risultato che sarà messo su ThingSpeak
 
 -- Terzo Capitolo: "Future" (molto breve)
-    Citare che si sta progettando un mini dispositivo che si mette sotto il bicchiere oppure come posa bicchiere, in modo da misurare anche quando sei a cena/pranzo.
+    Citare che si sta progettando un mini dispositivo che si mette sotto il bicchiere oppure come posa bicchiere, in modo da misurare anche quando sei a cena
+    Citare l'integrazione con le app "salute" del telefono per aumentare i dati per ai
+
+-- Conclusione "Demo"
