@@ -26,3 +26,5 @@ Testing/
 # File temporanei e di configurazione dell'IDE
 .DS_Store
 Thumbs.db
+
+env_IOT/
