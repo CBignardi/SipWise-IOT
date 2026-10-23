@@ -47,15 +47,15 @@ UPDATE_URL = "https://api.thingspeak.com/update"
 UPDATE_WRITE_KEY = os.getenv("TS_UPDATE_WRITE_KEY", "I4VYATTE7GLX1YW3")
 
 DATA_FIELDS = {
-    "waterGoal": "field2",
-    "timestamp": "field3",
-    "temperature": "field4",
-    "waterDrunk": "field5",
+    "waterGoal": "field1",
+    "timestamp": "field2",
+    "temperature": "field3",
+    "waterDrunk": "field4",
 }
 HUMAN_FIELDS = {
-    "sex": "field2",     # nell'app: 1 = Male, 0 = Female
-    "weight": "field3",  # kg
-    "age": "field4",     # anni
+    "sex": "field1",     # nell'app: 1 = Male, 0 = Female
+    "weight": "field2",  # kg
+    "age": "field3",     # anni
 }
 
 RESULTS = 10                         # scarica più righe per tollerare invii parziali
@@ -342,18 +342,21 @@ def run_once(session, model, dry_run=False, last_entry_id=None, force=False):
     confidence = proba[list(model.classes_).index(label)]
 
     print(
-        f"[{data['when']:%d/%m/%Y %H:%M}] bevuti {data['drunk']:.0f}/"
-        f"{data['goal']:.0f} ml (consigliati: {x[7]:.0f} ml), {data['temp']:.1f} °C | "
-        f"{'M' if person['sex'] else 'F'}, {person['age']:.0f} anni, "
+         "\n"
+        f"[{data['when']:%d/%m/%Y %H:%M}] drunk {data['drunk']:.0f}/"
+        f"{data['goal']:.0f} ml (suggested: {x[7]:.0f} ml), {data['temp']:.1f} °C | "
+        f"{'M' if person['sex'] else 'F'}, {person['age']:.0f} years old, "
         f"{person['weight']:.0f} kg"
     )
-    print(f"→ classe {label}: {CLASS_NAMES[label]} (confidenza {confidence:.0%})")
+    print(f"→ class {label}: {CLASS_NAMES[label]} (confidence {confidence:.0%})")
 
     if dry_run:
-        print("(dry-run: nessun invio)")
+        print("(dry-run: no data sent)")
     else:
         post_id = post_result(session, label)
-        print(f"POST inviata con successo, trend entry_id = {post_id}")
+        print(f"POST send successfully, trend entry_id = {post_id}")
+        
+    print("\n")
 
     return label, data["entry_id"]
 
