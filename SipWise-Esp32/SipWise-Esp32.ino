@@ -44,7 +44,7 @@
 #define WAIT_AFTER_READ 5000UL  // 5 sec, wait for the visualizzation of the results
 
 
-#define CALIBRATION_FACTOR 211.0f  // Calibration factor for the scale
+#define CALIBRATION_FACTOR 208.0f  // Calibration factor for the scale
 
 #define WATERGOAL_STANDARD 2000.0f
 
