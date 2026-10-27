@@ -166,8 +166,8 @@ sns.heatmap(
 )
 
 plt.title("Confusion Matrix")
-plt.xlabel("Classe Predetta")
-plt.ylabel("Classe Reale")
+plt.xlabel("Predicted Class")
+plt.ylabel("Real Class")
 plt.tight_layout()
 plt.show()
 
@@ -261,8 +261,8 @@ pred_counts = pd.Series(y_pred).value_counts().reindex(
 )
 
 distribution_df = pd.DataFrame({
-    "Reali": real_counts.values,
-    "Predette": pred_counts.values
+    "Real": real_counts.values,
+    "Predicted": pred_counts.values
 }, index=class_names)
 
 distribution_df.plot(
@@ -271,9 +271,9 @@ distribution_df.plot(
     width=0.8
 )
 
-plt.title("Distribuzione Classi: Reali vs Predette")
-plt.ylabel("Numero di campioni")
-plt.xlabel("Classe")
+plt.title("Class Distribution: Real vs Predicted")
+plt.ylabel("Number of elements")
+plt.xlabel("Class")
 plt.xticks(rotation=0)
 plt.legend()
 plt.grid(axis="y", alpha=0.3)
@@ -374,19 +374,19 @@ if not df_plot.empty:
         df_plot["timestamp_plot"],
         df_plot["waterDrunk"],
         marker="o",
-        label="Acqua bevuta"
+        label="Water Drunk"
     )
 
     plt.plot(
         df_plot["timestamp_plot"],
         df_plot["waterGoal"],
         linestyle="--",
-        label="Obiettivo giornaliero"
+        label="Daily Goal"
     )
 
-    plt.title("Andamento Consumo di Acqua nel Tempo")
-    plt.xlabel("Data e ora")
-    plt.ylabel("Quantità di acqua (ml)")
+    plt.title("Trends in Water Consumption Over Time")
+    plt.xlabel("Date and hour")
+    plt.ylabel("Water (ml)")
     plt.legend()
     plt.grid(alpha=0.3)
     plt.gcf().autofmt_xdate()
