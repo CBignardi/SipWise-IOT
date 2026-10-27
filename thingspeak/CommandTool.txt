@@ -1,0 +1,8 @@
+./tool <DATA/TREND/HUMAN> <GET/POST> <data1> <data2>
+DATA: <WaterGoal> <Timestamp> <Temperature> <WaterDrunk>
+TREND: <Trend>
+HUMAN: <Sex> <Weight> <Age>
+
+# Time 18:20:15
+./tool DATA POST 2800 1792261215 26.5 1250 
+./tool DATA POST -t 2800 26.5 1250 

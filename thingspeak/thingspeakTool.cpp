@@ -4,6 +4,7 @@
 #include <map>
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
+#include <time.h>
 
 using json = nlohmann::json;
 
@@ -46,6 +47,10 @@ void performGet(const std::string &url, const std::string &canale)
             if (canale == "TREND")
             {
                 maxIter = 1;
+            }
+            if (canale == "HUMAN")
+            {
+                maxIter = 3;
             }
 
             for (int i = 0; i < maxIter; i++)
@@ -132,15 +137,34 @@ int main(int argc, char *argv[])
     }
     else if (metodo == "POST")
     {
+        // Con "-t" il timestamp viene inserito in automatico (solo canale DATA)
+        bool autoTs = (argc > 3 && std::string(argv[3]) == "-t" && canale == "DATA");
+        int primo = autoTs ? 4 : 3;                                  // indice in argv del primo valore
+        const int TS_FIELD = 2;                                      // field in cui scrivere il timestamp
+        const long long now = static_cast<long long>(time(nullptr)); // secondi dal 1970 (UTC)
+
         std::ostringstream sstr;
-        std::cout << "Writing on the channel: " << canale << "; payload: ";
-        for (int i = 0; i < argc - 3; i++)
+        int field = 1; // prossimo field da scrivere
+        bool tsInserito = false;
+
+        for (int i = primo; i < argc; i++)
         {
-            sstr << "&field" << i + 1 << "=" << argv[i + 3];
+            if (autoTs && !tsInserito && field == TS_FIELD)
+            {
+                sstr << "&field" << field++ << "=" << now;
+                tsInserito = true;
+            }
+            sstr << "&field" << field++ << "=" << argv[i];
         }
-        std::cout << sstr.str() << std::endl;
+        if (autoTs && !tsInserito) // pochi valori: il timestamp va in coda
+            sstr << "&field" << field << "=" << now;
+
+        std::cout << "Writing on the channel: " << canale
+                  << "; payload: " << sstr.str() << std::endl;
+
         std::string postUrl = "https://api.thingspeak.com/update";
         std::string postData = "api_key=" + channels[canale].writeApiKey + sstr.str();
+        std::cout << postData << std::endl;
         performPost(postUrl, postData);
     }
     else
