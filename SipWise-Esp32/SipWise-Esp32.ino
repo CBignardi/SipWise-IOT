@@ -76,6 +76,9 @@ float waterDrinked_ml = 0.0f;
 float waterGoal_ml = 2000.0f;
 bool goalAutoUpdate = true;  // true -> automatic update; false -> value defined by user
 
+bool isRefreshArrived = false;
+
+
 bool clockSynced = false;
 int actualDay = -1;
 
@@ -117,7 +120,7 @@ enum State {
   REQUEST_TARE,
   TARE_MEASUREMENT,
   TARE_DISPLAY,
-  GOAL_CHANGED
+  GOAL_CHANGED,
 };
 
 // Actual state
@@ -272,7 +275,7 @@ void loop() {
         if (acc > THRESHOLD_MOVEMENT_LOW) {
           changeState(CHECK_MOVEMENT);
         } else {
-          if (timer.isOver()) {
+          if (timer.isOver() && isRefreshArrived) {
             changeState(SAVE_WEIGHT);
           }
         }
@@ -281,6 +284,8 @@ void loop() {
 
     case SAVE_WEIGHT:
       {
+        isRefreshArrived = false;  // Reset variable
+
         weightBottle_g = scale.get_units(5);
 
         if (weightBottle_g < 0) {
@@ -415,6 +420,21 @@ void loop() {
           sendDailyWater(waterDrinked_ml);
           changeState(prevState);
         }
+
+        // ── Command REFRESH ───────────────────────────────────
+        else if (msg.startsWith("REFRESH")) {
+          String v = msg.substring(8);
+          v.trim();
+
+          if (v.length() > 0 && isDigit(v[0])) {
+            waterDrinked_ml = v.toFloat();
+            Serial.printf("REFRESH: water drunk updated to %.0f ml\n", waterDrinked_ml);
+            isRefreshArrived = true;
+          } else {
+            Serial.println("REFRESH: value not valid, keeping the local one.");
+          }
+        }
+        changeState(prevState);
       }
       break;
 
@@ -493,7 +513,9 @@ void changeState(State newState) {
       break;
 
     case READING_IN_PROGRESS:
-      timer.startTimer(2000UL);  // Set the timer for 2 s
+      timer.startTimer(2000UL);     // Set the timer for 2 s
+      SerialBT.println("REFRESH");  // Send Command Refresh
+
       updateDisplay("Reading soon...");
       break;
 
