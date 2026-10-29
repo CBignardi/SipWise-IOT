@@ -103,16 +103,13 @@ Protocollo testuale, ogni messaggio è terminato da `\n`.
 | `TIME:<epoch>` | Sincronizza l'orologio interno (Unix timestamp) |
 | `TARE` | Avvia la procedura di tara della bilancia |
 | `SEND` | Richiede l'invio immediato dei dati attuali |
-| `SEND_DAY` | Richiede l'invio del totale acqua giornaliero |
 
 ### Risposte inviate (ESP32 → app)
 
 | Messaggio | Descrizione |
 |---|---|
 | `DATA,<waterDrunk>,<waterGoal>,<weight>,<temp>,<humidity>` | Dati attuali della borraccia |
-| `DAY,<ml>` | Totale giornaliero (automatico a mezzanotte o su `SEND_DAY`) |
 | `OK:TARE` | Conferma tara eseguita |
-| `OK:RESET` | Conferma reset contatore |
 | `OK:GOAL` | Conferma nuovo obiettivo impostato |
 | `OK:TIME` | Conferma sincronizzazione orologio |
 | `ERR:TIME` | Timestamp ricevuto non valido (< anno 2001) |

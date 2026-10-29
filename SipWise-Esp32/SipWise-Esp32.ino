@@ -38,9 +38,11 @@
 
 #define THRESHOLD_MOVEMENT_LOW 0.3f   // Soft movement
 #define THRESHOLD_MOVEMENT_HIGH 1.5f  // Hard movement
+#define THRESHOLD_ROLL 10.0f          // Soft movement
+#define THRESHOLD_PITCH 10.0f         // Soft movement
 
 #define WAIT_AFTER_MOV 2000UL   // 2 sec, wait after a big movement
-#define INTERVAL_READ 10000UL   // 10 sec, interval between the mesurement
+#define INTERVAL_READ 40000UL   // 40 sec, interval between the mesurement
 #define WAIT_AFTER_READ 5000UL  // 5 sec, wait for the visualizzation of the results
 
 
@@ -78,11 +80,16 @@ bool goalAutoUpdate = true;  // true -> automatic update; false -> value defined
 
 bool isRefreshArrived = false;
 
-
 bool clockSynced = false;
 int actualDay = -1;
 
 bool btConnected = false;
+
+struct MotionData {
+  float acc;
+  float roll;
+  float pitch;
+};
 
 struct Timer {
   unsigned long tsStart = 0;
@@ -132,16 +139,15 @@ State prevState;
 //  DEFINITIONS OF THE FUNCTIONS
 // ============================================================
 void inizializeMPU9250();
-float readAcceleration();
+MotionData readAcceleration();
 float calculateWaterGoal(float weight_kg, int age, float temp_C);
 void updateDisplay(const char* r1, const char* r2 = "", const char* r3 = "");
 void manageBT();
 void sendStateBT();
-void sendDailyWater(float ml);
 void doTare();
 time_t getEpochNow();
 int getDayNumber(time_t epoch);
-void checkReset24h();
+void updateDay();
 void changeState(State newState);
 
 
@@ -218,7 +224,7 @@ void loop() {
 
   // Reset if we changed day
   if (clockSynced) {
-    checkReset24h();
+    updateDay();
   }
 
   switch (state) {
@@ -241,20 +247,23 @@ void loop() {
 
     case CHECK_MOVEMENT:
       {
-        float acc = readAcceleration();
+        MotionData motionData = readAcceleration();
 
         //Serial.printf("DBG Movement: %.2f g\n", acc);
 
-        if (acc > THRESHOLD_MOVEMENT_HIGH) {
-          Serial.printf("Movement: %.2f g\n", acc);
+        if (motionData.acc > THRESHOLD_MOVEMENT_HIGH || abs(motionData.roll) > THRESHOLD_ROLL || abs(motionData.pitch) > THRESHOLD_PITCH) {
+          Serial.printf("Movement: %.2f g\n", motionData.acc);
+          Serial.printf("acc  %.1f roll %.1f  pitch %.1f\n", motionData.acc, motionData.roll, motionData.pitch);
+
           changeState(AFTER_MOVEMENT);
 
-        } else if (acc > THRESHOLD_MOVEMENT_LOW) {
+        } else if (motionData.acc > THRESHOLD_MOVEMENT_LOW || abs(motionData.roll) > THRESHOLD_ROLL || abs(motionData.pitch) > THRESHOLD_PITCH) {
           timer.startTimer(INTERVAL_READ);  // Reset the timer for the reading
 
         } else {
           // Bottle not moving
           if (timer.isOver()) {
+
             changeState(READING_IN_PROGRESS);
           }
         }
@@ -271,11 +280,15 @@ void loop() {
 
     case READING_IN_PROGRESS:
       {
-        float acc = readAcceleration();
-        if (acc > THRESHOLD_MOVEMENT_LOW) {
+        MotionData motionData = readAcceleration();
+        if (motionData.acc > THRESHOLD_MOVEMENT_LOW || abs(motionData.roll) > THRESHOLD_ROLL || abs(motionData.pitch) > THRESHOLD_PITCH) {
+          Serial.printf("acc  %.1f roll %.1f  pitch %.1f\n", motionData.acc, motionData.roll, motionData.pitch);
+
           changeState(CHECK_MOVEMENT);
         } else {
           if (timer.isOver() && isRefreshArrived) {
+            Serial.printf("acc  %.1f roll %.1f  pitch %.1f\n", motionData.acc, motionData.roll, motionData.pitch);
+
             changeState(SAVE_WEIGHT);
           }
         }
@@ -415,23 +428,30 @@ void loop() {
           changeState(prevState);
         }
 
-        // ── Command SEND_DAY ───────────────────────────────────
-        else if (msg == "SEND_DAY") {
-          sendDailyWater(waterDrinked_ml);
-          changeState(prevState);
-        }
-
         // ── Command REFRESH ───────────────────────────────────
         else if (msg.startsWith("REFRESH")) {
-          String v = msg.substring(8);
-          v.trim();
+          int comma = msg.indexOf(',');
 
-          if (v.length() > 0 && isDigit(v[0])) {
-            waterDrinked_ml = v.toFloat();
-            Serial.printf("REFRESH: water drunk updated to %.0f ml\n", waterDrinked_ml);
-            isRefreshArrived = true;
+          String waterDrunk = msg.substring(8, comma);
+          waterDrunk.trim();
+          String timestamp = msg.substring(comma + 1);
+          timestamp.trim();
+
+          time_t day = getDayNumber(atol(timestamp.c_str()));
+          Serial.printf("Refresh day: %i\n", day);
+
+          if (day >= actualDay) {  // If the day recived is bigger, we use it
+
+            if (waterDrunk.length() > 0 && isDigit(waterDrunk[0])) {
+              waterDrinked_ml = waterDrunk.toFloat();
+              Serial.printf("REFRESH: water drunk updated to %.0f ml\n", waterDrinked_ml);
+              isRefreshArrived = true;
+            } else {
+              Serial.println("REFRESH: value not valid, keeping the local one.");
+            }
           } else {
-            Serial.println("REFRESH: value not valid, keeping the local one.");
+            waterDrinked_ml = 0.0;
+            isRefreshArrived = true;
           }
         }
         changeState(prevState);
@@ -448,11 +468,14 @@ void loop() {
 
     case TARE_MEASUREMENT:
       {
-        float acc = readAcceleration();
-        if (acc > THRESHOLD_MOVEMENT_LOW) {
+        MotionData motionData = readAcceleration();
+        if (motionData.acc > THRESHOLD_MOVEMENT_LOW || abs(motionData.roll) > THRESHOLD_ROLL || abs(motionData.pitch) > THRESHOLD_PITCH) {
           // The bottle is moving
+
           updateDisplay("Tare...", "Do not move the bottle!");
         } else {
+          Serial.printf("acc  %.1f roll %.1f  pitch %.1f\n", motionData.acc, motionData.roll, motionData.pitch);
+
           // The bottle is not moving
           doTare();
           changeState(TARE_DISPLAY);
@@ -566,17 +589,17 @@ void inizializeMPU9250() {
 }
 
 
-
-float readAcceleration() {
+MotionData readAcceleration() {
   Wire.beginTransmission(MPU9250_ADDR);
   Wire.write(ACCEL_XOUT_H);
   Wire.endTransmission(false);
 
   // Request 2 byte per axes: (X_H, X_L, Y_H, Y_L, Z_H, Z_L)
   Wire.requestFrom((uint8_t)MPU9250_ADDR, (uint8_t)6, (uint8_t) true);
+  MotionData retVal;
 
   if (Wire.available() < 6) {
-    return 0.0f;
+    return retVal;
   }
 
   // Combine the two bytes in a single variable
@@ -590,9 +613,11 @@ float readAcceleration() {
   float gz = az / 16384.0f;
 
   // Calculate the amplitude of the acceleration vector and subtract 1 g (the contribution of gravity)
-  float net = sqrtf(gx * gx + gy * gy + gz * gz) - 1.0f;
+  retVal.acc = fabsf(sqrtf(gx * gx + gy * gy + gz * gz) - 1.0f);
+  retVal.roll = atan2(ay, az) * 180.0 / PI;
+  retVal.pitch = atan2(-ax, sqrt(ay * ay + az * az)) * 180.0 / PI;
 
-  return fabsf(net);
+  return retVal;
 }
 
 
@@ -636,44 +661,21 @@ int getDayNumber(time_t epoch) {
 }
 
 
-void checkReset24h() {
-  int today = getDayNumber(getEpochNow());  // Number of today
+void updateDay() {
+  int day = getDayNumber(getEpochNow());
+  if (actualDay != day) {
+    Serial.printf("Day changed, now: %i\n", day);
 
-  // Initialize the reference day
-  if (actualDay < 0) {
-    actualDay = today;
-    return;
+    actualDay = day;
   }
-
-  if (today != actualDay) {
-    Serial.printf("Changed day! Total water: %.0f ml. Reset in progress...\n", waterDrinked_ml);
-
-    // Send to the app the daily report
-    sendDailyWater(waterDrinked_ml);
-
-    waterDrinked_ml = 0.0f;
-    actualDay = today;
-  }
-}
-
-
-void sendDailyWater(float ml) {
-  if (!btConnected) return;
-
-  String payload = "DAY,";
-  payload += String(ml, 0);
-  SerialBT.println(payload);
-  Serial.printf("BT sended report: %s\n", payload.c_str());
 }
 
 
 void sendStateBT() {
   if (!btConnected) return;
 
-
   sensors_event_t hum_ev, temp_ev;
   aht.getEvent(&hum_ev, &temp_ev);
-
 
   String payload = "DATA,";
   payload += String(waterDrinked_ml, 0);
