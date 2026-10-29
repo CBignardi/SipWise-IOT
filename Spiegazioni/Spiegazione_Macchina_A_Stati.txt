@@ -1,0 +1,28 @@
+(Per spiegare bene direi che bisogna indicare le trasizioni mentre si spiegano)
+
+Si parte con i primi due stati che attendono la connessione bleutooth, dopo di che una volta instaurata la connessine si passa allo stato "CHECK_MOVEMENT" che sarà lo stato principale della macchina a stati. A questo punto il diagramma divide in due zone principali, una per la lettura del peso e l'altra per la ricezione dei comandi bleutooth. Per quanto riguarda la lettura del dato, questo viene fatto se si verificano due condizioni, cioè se abbiamo atteso 20 min oppure se si è verificato un movimento forte. In entrambi i casi arriveremo allo stato "READING_IN_PROGRESS" e per effettuare veramente la lettura bisognerà aspettare 2 secondi, nei quali il dispositivo deve rimanere fermo, altrimenti si ritorna nello stato "CHECK_MOVEMENT". Quindi se il dispositivo è fermo e abbiamo ricevuto il messaggio di REFRESH che aggiorna il valore di acqua bevuta, il funzionamento di questo messaggio verrà spiegato succesivamente, allora possiamo leggere veramente il peso e ritornare nello stato "CHECK_MOVEMENT". 
+Per quanto riguarda la ricezioni dei comandi bleutooth, si parte da questo stato "CMD_ARRIVED" (COMMAND_ARRIVED). In cui possiamo arrivarci da ogni stato, e per questioni di leggibilità è stato indicato da questa freccia tratteggiata. Quindi quando arriva un comando si controlla di che "tipo" e si andrà ad eseguire la richiesta, come ad esempio se è di tipo "TARA" allora andremo ad eseguirla. Per tutti gli altri comandi, che generalmente inviano un valore da aggiornare, nello stato "CMD_ARRIVED" si andrà ad aggiornare quel valore e si ritornerà nello stato da cui sono arrivati. 
+
+(Domanda: Come fa a ritornare allo stato precedente? Prima di passare allo stato "CMD_ARRIVED" mi salvo il valore dello stato attuale in una variabile, così so dove ritornare)
+
+(Domanda: Come fa a saltare da ogni stato nello stato CMD_ARRIVEDE/WAIT_CONNECTION? All'inizio del loop viene controllato se c'è un messaggio bleutooth oppure se è stato disconnesso il bleutooth, e se si verificano una delle due condizioni allora passerò nei rispettivi stati)
+
+(Domanda: Per quanto riguarda i delay come sono stati gestiti? Da una classe Timer in cui ci saranno due funzioni una per far partire il timer e una per controllare se è scaduto. Quindi non ci sono attese "morte" (quest'ultima frase è quello che vuole sapere))
+Ti metto il codice qua cosi capisci:
+struct Timer {
+  unsigned long tsStart = 0;
+  unsigned long delay_ = 0;
+
+  void startTimer(unsigned long delay) {
+    tsStart = millis();
+    delay_ = delay;
+  }
+
+  bool isOver() {
+    if (millis() - tsStart >= delay_) {
+      return true;
+    }
+    return false;
+  }
+};
+(Sta cosa del delay "attivo" si può dimostrare, stando in uno stato dove c'è una wait e facendo partire dall'app un comando come quello di "change_goal" e si vede che l'esp si aggiorna e ritorna nello stato precedente)
